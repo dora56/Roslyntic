@@ -4,7 +4,7 @@ This document is the practical implementation guide for AI agents and humans.
 
 ## MVP goal
 Implement `roslyntic check <path>` that:
-1) Loads a `.sln` or `.csproj` using MSBuildWorkspace.
+1) Loads a `.sln`, `.slnx`, or `.csproj` using MSBuildWorkspace.
 2) Runs built-in rules:
     - `AGARCH0001` Layer violation
     - `AGCOMP0001` Cyclomatic complexity threshold
@@ -33,14 +33,15 @@ Implement `roslyntic check <path>` that:
 ## Observability
 See `docs/observability.md` for the observability requirements and MVP SLI/SLO.
 
-## Repo layout (recommended)
-- `Roslyntic.Cli`       : entrypoint + command parsing
-- `Roslyntic.Core`      : workspace loading + orchestration + config
-- `Roslyntic.Analysis`  : dependency extraction + SCC + complexity calculator
-- `Roslyntic.Rules`     : built-in rules producing diagnostics
-- `Roslyntic.Sarif`     : SARIF 2.1.0 writer/mapping
-- `Roslyntic.Tests`     : unit tests + snapshot tests
-- `samples/`            : tiny sample solution for integration tests
+## Repo layout (current)
+- `src/Roslyntic.Cli/Program.cs` : entrypoint
+- `src/Roslyntic.Cli/Core/` : command contract + workspace loading + pipeline orchestration
+- `src/Roslyntic.Cli/Analysis/` : dependency extraction + complexity calculation
+- `src/Roslyntic.Cli/Rules/` : built-in rules producing diagnostics
+- `src/Roslyntic.Cli/Sarif/` : SARIF 2.1.0 and JSON mapping/writers
+- `tests/Roslyntic.Tests/Integration/` : CLI contract/integration tests
+- `tests/Roslyntic.Tests/Unit/` : analysis/rule/sarif unit tests
+- `tests/Roslyntic.Tests/TestSupport/` : CLI harness and test helpers
 
 ## Configuration (optional for MVP)
 If needed, add `roslyntic.json` with defaults:
@@ -61,7 +62,7 @@ Keep schema simple and documented.
 - SARIF mapping (snapshot / golden file)
 
 ### Integration test (required)
-- Create `samples/` with a minimal multi-project solution:
+- Create `sample/` with a minimal multi-project solution:
     - `Samples.Domain`
     - `Samples.Application`
     - `Samples.Infrastructure`
@@ -69,7 +70,7 @@ Keep schema simple and documented.
 - Intentionally include:
     - a forbidden dependency (UI referencing Infrastructure or Domain directly)
     - a method with complexity > threshold
-- Run `roslyntic check samples/Samples.sln` and assert:
+- Run `roslyntic check sample/Samples.slnx` (or `.sln`) and assert:
     - SARIF is valid JSON
     - expected ruleIds exist
     - ordering is stable
@@ -85,7 +86,7 @@ Plugins are Phase 2+. When introduced:
 - Prefer an isolated worker process with timeout and deterministic failure reporting (`AGSAFE9001`).
 
 ## Definition of done (MVP)
-- `roslyntic check` works on a real `.sln`
+- `roslyntic check` works on a real `.sln`/`.slnx`/`.csproj`
 - SARIF 2.1.0 output is deterministic
 - Tests pass (unit + integration)
 - README includes usage examples
