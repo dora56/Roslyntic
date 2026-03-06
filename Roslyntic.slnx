@@ -1,3 +1,8 @@
 <Solution>
-  <Project Path="Roslyntic.Cli/Roslyntic.Cli.csproj" />
+  <Project Path="src/Roslyntic.Cli/Roslyntic.Cli.csproj" />
+  <Project Path="src/Roslyntic.Core/Roslyntic.Core.csproj" />
+  <Project Path="src/Roslyntic.Analysis/Roslyntic.Analysis.csproj" />
+  <Project Path="src/Roslyntic.Rules/Roslyntic.Rules.csproj" />
+  <Project Path="src/Roslyntic.Sarif/Roslyntic.Sarif.csproj" />
+  <Project Path="tests/Roslyntic.Tests/Roslyntic.Tests.csproj" />
 </Solution>

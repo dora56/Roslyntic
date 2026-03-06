@@ -7,7 +7,7 @@ architecture consistent and quality gates enforceable in CI.
 
 ## What it is
 A local-only C# static analysis CLI built on Roslyn/MSBuild that:
-- Loads `.sln` / `.csproj` via MSBuildWorkspace
+- Loads `.sln` / `.slnx` / `.csproj` via MSBuildWorkspace
 - Detects architecture violations and computes complexity metrics
 - Emits machine-readable results in **SARIF 2.1.0** (and JSON)
 - Supports **Mentorship-as-Code**: project-specific rules implemented as C# plugins
@@ -47,10 +47,10 @@ Optionally, use `--log-file <path>` and `--log-format json` for CI-friendly stru
 # SARIF to STDOUT, logs to STDERR
 roslyntic check .
 # or
-roslyntic check path/to/MySolution.sln --format sarif > results.sarif
+roslyntic check path/to/MySolution.slnx --format sarif > results.sarif
 
 # Keep logs in a file (CI)
-roslyntic check path/to/MySolution.sln --format sarif --log-file roslyntic.log --log-format json > results.sarif
+roslyntic check path/to/MySolution.slnx --format sarif --log-file roslyntic.log --log-format json > results.sarif
 ```
 
 ## Rules
@@ -78,6 +78,14 @@ If a plugin fails or times out, Roslyntic reports a deterministic diagnostic (e.
 ## CI integration
 
 Roslyntic is designed to run in GitHub Actions and publish SARIF to Code Scanning.
+
+## Repository layout
+
+- `src/`: Roslyntic production projects (current: `src/Roslyntic.Cli`)
+- `tests/`: Roslyntic test projects (current: `tests/Roslyntic.Tests`)
+- `sample/`: reserved for future sample projects used in rule-validation test targets
+
+Note: sample project/entity creation is out of scope for this task and will be handled in a separate task.
 
 ## Status
 

@@ -12,15 +12,16 @@ Architecture decisions that define non-negotiable contracts:
 - [ADR-0003: Plugin Safety Model](adr/ADR-0003-plugin-safety-model.md) — Phase 2+ isolated worker process, no in-process untrusted plugins
 
 ## Components
-### Roslyntic.Cli
+### src/Roslyntic.Cli/Program.cs
+- CLI entrypoint that delegates to `Core/RoslynticApp.RunAsync`.
+
+### src/Roslyntic.Cli/Core
 - Parses args (`roslyntic check ...`)
 - Selects output format
 - Writes machine output to STDOUT, human messages to STDERR
 - Handles exit codes
 - Controls observability options (`--log-file`, `--log-format`, verbosity)
-
-### Roslyntic.Core
-- Loads `.sln`/`.csproj` via MSBuildWorkspace
+- Loads `.sln`/`.slnx`/`.csproj` via MSBuildWorkspace
 - Orchestrates analysis pipeline:
     - build analysis context
     - run rules
@@ -28,19 +29,19 @@ Architecture decisions that define non-negotiable contracts:
     - format output
 - Emits structured observability events to a logger abstraction (sink = STDERR/log file)
 
-### Roslyntic.Analysis
+### src/Roslyntic.Cli/Analysis
 - Provides reusable analysis utilities:
     - dependency extraction helpers (semantic model based)
     - cyclomatic complexity calculator
     - (future) dependency graph + SCC cycle detection
 - Should not write to STDOUT/STDERR directly (use logger abstraction if needed)
 
-### Roslyntic.Rules
+### src/Roslyntic.Cli/Rules
 - Implements built-in rules using Analysis utilities
 - Outputs diagnostics in an internal, format-agnostic model
 - Should not write to STDOUT/STDERR directly
 
-### Roslyntic.Sarif
+### src/Roslyntic.Cli/Sarif
 - Maps internal diagnostics to SARIF 2.1.0:
     - tool metadata
     - rules definitions
@@ -48,10 +49,10 @@ Architecture decisions that define non-negotiable contracts:
 - Keeps payload small and deterministic
 - Should not write logs to STDOUT (only the SARIF writer writes to STDOUT)
 
-### Roslyntic.Tests
+### tests/Roslyntic.Tests
 - Unit tests for analysis utilities and rule behavior
 - Snapshot tests for SARIF output
-- Integration tests using `samples/`
+- Integration tests using `sample/`
 
 ## Observability model (NFR)
 Roslyntic must be observable without polluting STDOUT.

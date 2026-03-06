@@ -38,3 +38,5 @@ Exit codes must clearly distinguish findings from tool failures.
 ## Notes
 - Observability details: docs/observability.md
 - SARIF ordering requirements are referenced in ADR-0002.
+- ネットワークポリシーの詳細スコープ定義（ランタイム vs ビルド時）は ADR-0005 を参照。
+- OTel opt-in オブザーバビリティ戦略は ADR-0004 を参照。
