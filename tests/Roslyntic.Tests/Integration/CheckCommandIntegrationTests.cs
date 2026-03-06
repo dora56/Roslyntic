@@ -12,7 +12,7 @@ public class CheckCommandIntegrationTests
 {
     // Resolve paths relative to the repository root (two levels up from test output dir)
     private static readonly string RepoRoot =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "../src"));
 
     private static readonly string SamplesSln =
         Path.Combine(RepoRoot, "samples", "Samples.sln");

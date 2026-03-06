@@ -1,8 +1,8 @@
 <Solution>
-  <Project Path="Roslyntic.Cli/Roslyntic.Cli.csproj" />
-  <Project Path="Roslyntic.Core/Roslyntic.Core.csproj" />
-  <Project Path="Roslyntic.Analysis/Roslyntic.Analysis.csproj" />
-  <Project Path="Roslyntic.Rules/Roslyntic.Rules.csproj" />
-  <Project Path="Roslyntic.Sarif/Roslyntic.Sarif.csproj" />
-  <Project Path="Roslyntic.Tests/Roslyntic.Tests.csproj" />
+  <Project Path="src/Roslyntic.Cli/Roslyntic.Cli.csproj" />
+  <Project Path="src/Roslyntic.Core/Roslyntic.Core.csproj" />
+  <Project Path="src/Roslyntic.Analysis/Roslyntic.Analysis.csproj" />
+  <Project Path="src/Roslyntic.Rules/Roslyntic.Rules.csproj" />
+  <Project Path="src/Roslyntic.Sarif/Roslyntic.Sarif.csproj" />
+  <Project Path="tests/Roslyntic.Tests/Roslyntic.Tests.csproj" />
 </Solution>
