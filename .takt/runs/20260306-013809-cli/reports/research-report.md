@@ -2,7 +2,7 @@
 
 ## 調査概要
 
-RoslynticにおけるOpenTelemetry（OTel）の関係性と、ツールのネットワーク通信必要性について調査した。コードベースの現状スキャンと、外部OSS事例・類似ツールのネットワークポリシー比較を通じて、「no network calls / no telemetry by default」制約を維持しつつOTel統合を可能にするアーキテクチャ案を整理する。
+RoslynticにおけるOpenTelemetry（OTel）の関係性と、ツールのネットワーク通信必要性について調査した。コードベースの現状スキャンと、外部OSS事例・類似ツールのネットワークポリシー比較を通じて、「no network calls / no telemetry by default」制約を維持しつつOTel統合を可能にするアーキテクチャ案を整理し、ADR-0004・ADR-0005として意思決定を記録した。
 
 ---
 
@@ -10,8 +10,8 @@ RoslynticにおけるOpenTelemetry（OTel）の関係性と、ツールのネッ
 
 - **現時点でOTel・ネットワーク通信コードはともにゼロ**。Roslynticは完全なスケルトン段階（`Program.cs` 3行）であり、PackageReferenceも0件
 - **`OTEL_EXPORTER_OTLP_ENDPOINT` 環境変数による完全opt-in**はすべての制約（「no telemetry by default」「STDOUT汚染なし」「決定論的出力」）と両立する
-- **ADR-0001「no network calls」はランタイム時のアウトバウンド通信禁止**と解釈するのが業界標準。ビルド時NuGet restoreは「事前工程」として除外されるが、ADR上は明文化されていない（中重要ギャップ）
-- **Semgrep失敗教訓**: OTel SDKを必須依存関係にすると、opt-in機能でも全ユーザーにパッケージサイズ・依存関係競合の影響が出る（Issue #10408未解決）。条件付き参照が必須
+- **ADR-0001「no network calls」はランタイム時のアウトバウンド通信禁止**と解釈するのが業界標準。ビルド時NuGet restoreは「事前工程」として除外されるが、ADR上は明文化されていなかった（→ADR-0005で解決済み）
+- **Semgrep失敗教訓**: OTel SDKを必須依存関係にすると、opt-in機能でも全ユーザーにパッケージサイズ・依存関係競合の影響が出る（Issue #10408）。条件付き参照が必須
 - **競争優位**: ローカル完結SARIF出力はSonarScanner（サーバー必須）と対極的な設計で、エアギャップCI環境における差別化要素となる
 
 ---
@@ -34,7 +34,7 @@ Roslynticは現時点で実装前のスケルトン段階。`Roslyntic.Core`/`Ro
 |---|---|
 | ランタイム時（分析実行中）のアウトバウンド通信 | **対象**（明示） |
 | テレメトリ送信 | **対象**（明示） |
-| ビルド時・NuGet restore | **明文化なし**（ギャップ） |
+| ビルド時・NuGet restore | **明文化なし**（ギャップ → ADR-0005で解消） |
 
 ---
 
@@ -57,12 +57,10 @@ CLIツールでのOTel採用は**少数派**。採用する場合は環境変数
 
 **Flushタイミング問題**: `BatchSpanProcessor`（デフォルト5000ms間隔）はCLIの短寿命プロセスではexportされないまま終了するリスクがある。
 
-対策:
-
 | 方法 | 説明 |
 |---|---|
 | `using var host = builder.Build()` | IHost.Dispose()でLoggerFactory自動Flush（最推奨） |
-| `TracerProvider.ForceFlush()` | プロセス終了前に明示呼び出し |
+| `TracerProvider.ForceFlush()` | プロセス終了前に明示呼び出し（推奨タイムアウト: 10,000ms） |
 | `ScheduledDelayMilliseconds = 1000` | デフォルト5000msを短縮 |
 
 出典: [opentelemetry-dotnet #5102](https://github.com/open-telemetry/opentelemetry-dotnet/issues/5102)、[#2979](https://github.com/open-telemetry/opentelemetry-dotnet/issues/2979)
@@ -92,7 +90,6 @@ CLIツールでのOTel採用は**少数派**。採用する場合は環境変数
 
 #### 3-2. 業界標準の「no network calls」解釈
 
-調査で確認された業界標準的解釈:
 1. **「no network calls」= 分析ランタイム時のアウトバウンド通信禁止**が主流
 2. **NuGet restoreは「ビルド前工程」**として分離（`dotnet restore`済みを前提とするツールが多い）
 3. **テレメトリはopt-out可能であること**が事実上の要件（.NET SDK自体が模範例: `DOTNET_CLI_TELEMETRY_OPTOUT=1`）
@@ -102,21 +99,20 @@ CLIツールでのOTel採用は**少数派**。採用する場合は環境変数
 
 ---
 
-### 4. 統合的改善提案
+### 4. 統合的改善提案とADR成果物
 
-#### OTel opt-in導入方針
+#### ADR-0004: OTel opt-in戦略（作成・Accepted）
 
-| 判断ポイント | 推奨 |
+| 判断ポイント | 決定内容 |
 |---|---|
-| デフォルト動作 | OTel完全無効（`OTEL_EXPORTER_OTLP_ENDPOINT` 未設定時） |
-| opt-in方法 | 環境変数 `OTEL_EXPORTER_OTLP_ENDPOINT` を設定するだけで有効化 |
-| シグナル | Traces + Metricsを優先（LogsはNDJSONで既にカバー済み） |
-| Flush保証 | `using var host = builder.Build()` パターン必須 |
-| パッケージ依存 | 条件付き参照（Semgrep Issue #10408の教訓を反映） |
-| STDERR汚染対策 | `OTEL_LOG_LEVEL=none` またはOTel自己テレメトリの明示的無効化 |
-| 制約との整合性 | ✅「no telemetry by default」・「STDOUT汚染なし」・「決定論的出力」すべてと両立 |
+| デフォルト動作 | OTel完全無効（`OTEL_EXPORTER_OTLP_ENDPOINT` 未設定時はSDK初期化すら実行しない） |
+| opt-in方法 | 環境変数 `OTEL_EXPORTER_OTLP_ENDPOINT` を唯一のゲートとする |
+| シグナル | Traces + Metricsのみ（LogsはNDJSONが担当） |
+| Flush保証 | `using var host = builder.Build()` パターン必須（IHost.Dispose()経由） |
+| パッケージ依存 | 条件付き参照（Semgrep Issue #10408の教訓を根拠） |
+| STDERR汚染対策 | OTel自己テレメトリの明示的無効化を必須（`OTEL_LOG_LEVEL=none`は自動計装向けのみ有効。手動SDK組み込みには`SilentOtelEventListener`パターンが必要） |
 
-**.NET実装例**:
+**.NET実装例（Pattern D）**:
 ```csharp
 var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
 if (otlpEndpoint is not null)
@@ -128,15 +124,21 @@ if (otlpEndpoint is not null)
 // using var host = builder.Build(); で自動Flush保証
 ```
 
-#### ネットワークポリシー方針
+#### ADR-0005: ネットワークポリシー・エアギャップ対応（作成・Accepted）
 
-| 判断ポイント | 推奨 |
+| 判断ポイント | 決定内容 |
 |---|---|
-| ADR-0001スコープの明確化 | 「ランタイム中のアウトバウンド通信禁止」と明文化（ビルド時除外を明示） |
-| MSBuildWorkspace NuGet通信 | 「`dotnet restore`済みを前提条件とする」をドキュメントに必須記載 |
-| NuGet自動復元の制御 | `EnableNuGetPackageRestore=false` または `--no-restore` の適用を検討 |
+| 「no network calls」スコープ | ランタイム（分析実行中）のアウトバウンド通信禁止。ビルド時NuGet restoreは「事前工程」として除外 |
+| 実行前提条件 | `dotnet restore` 済みの環境での実行を前提とする |
+| MSBuildWorkspace NuGet制御 | `EnableNuGetPackageRestore=false` 相当の設定。未復元時は終了コード2で明確なエラーメッセージを出力 |
 | バージョンチェック | 実装しない（SARIFの `tool.driver.version` に埋め込むのみ） |
-| エアギャップ対応 | 事前NuGetキャッシュ + スタンドアローン実行ファイル配布のガイドを提供 |
+| エアギャップ対応 | 内部NuGetフィードミラーリング + スタンドアローン実行ファイル配布のガイダンス |
+
+#### ADR-0001 更新
+
+ADR-0001のNotesセクションに以下を追加済み:
+- ネットワークポリシー詳細スコープ定義はADR-0005を参照
+- OTel opt-inオブザーバビリティ戦略はADR-0004を参照
 
 ---
 
@@ -161,25 +163,24 @@ if (otlpEndpoint is not null)
 | 15 | [NuGet Package Restore - MS Learn](https://learn.microsoft.com/en-us/nuget/consume-packages/package-restore) | Web | High |
 | 16 | [Using MSBuildWorkspace - DustinCampbell](https://gist.github.com/DustinCampbell/32cd69d04ea1c08a16ae5c4cd21dd3a3) | Web | Medium |
 | 17 | [marcon.me - CLI telemetry best practices](https://marcon.me/articles/cli-telemetry-best-practices/) | Web | Medium |
-| 18 | [Coroot - OTel Go overhead](https://coroot.com/blog/opentelemetry-for-go-measuring-the-overhead/) | Web | Medium |
 
 ---
 
 ## 結論と推奨
 
-**現状**: Roslynticはスケルトン段階であり、OTelコード・ネットワーク通信コードともにゼロ。設計フェーズでの意思決定ガイダンスとして本調査の価値がある。
+**現状**: Roslynticはスケルトン段階であり、OTelコード・ネットワーク通信コードともにゼロ。設計フェーズでの意思決定ガイダンスとして本調査を活用できる。
 
-**OTel統合**: `OTEL_EXPORTER_OTLP_ENDPOINT` 環境変数による完全opt-in方式を採用すれば、「no telemetry by default」「STDOUT汚染なし」「決定論的出力」の全制約と両立可能。Semgrep Issue #10408の教訓から、OTel SDKは条件付き参照（必須依存関係にしない）とすることが必須。
+**OTel統合**: `OTEL_EXPORTER_OTLP_ENDPOINT` 環境変数による完全opt-in方式を採用すれば、「no telemetry by default」「STDOUT汚染なし」「決定論的出力」の全制約と両立可能。Semgrep Issue #10408の教訓から、OTel SDKは条件付き参照（必須依存関係にしない）とすることが必須。これをADR-0004として記録済み。
 
-**ネットワークポリシー**: ADR-0001の「no network calls」はランタイム時のアウトバウンド通信禁止と解釈するのが業界標準に合致する。MSBuildWorkspaceのNuGet restoreは「事前工程」として扱い、実行前提条件として「`dotnet restore`済みの環境」をドキュメントに明記すべき。
+**ネットワークポリシー**: ADR-0001の「no network calls」はランタイム時のアウトバウンド通信禁止と解釈するのが業界標準に合致する。MSBuildWorkspaceのNuGet restoreは「事前工程」として扱い、実行前提条件として「`dotnet restore`済みの環境」をドキュメントに明記すべき。これをADR-0005として記録済み。
 
-**競争優位**: ローカル完結SARIF出力の設計はエアギャップCI環境（金融・政府系）で差別化要素となる。この優位性を維持するため、「no network calls by default」ポリシーは堅持すべき。
+**競争優位**: ローカル完結SARIF出力の設計はエアギャップCI環境（金融・政府系）で差別化要素となる。「no network calls by default」ポリシーを堅持しつつ、OTel opt-in対応で大規模企業のオブザーバビリティ基盤との統合も可能にする設計が最適。
 
 ---
 
 ## 残存ギャップ
 
-- **ADR-0001のビルド時スコープ不明確**（重要度: 中）: 「no network calls」がビルド時NuGet restoreを含むかどうかが未明文化。後続ADRまたはREADMEへの明文化を推奨
-- **.NET OTel SDK初期化コストの実測値なし**（重要度: 低）: 公開ベンチマークが存在しない。静的解析ツールの文脈では数十ms程度と推定するが推測（実装後に計測を推奨）
+- **.NET OTel SDK初期化コストの実測値なし**（重要度: 低）: 公開ベンチマークが存在しない。静的解析ツールの文脈では数十ms程度と推定するが推測。実装後に計測を推奨
 - **MSBuildWorkspace NuGetトリガーの実動作確認**（重要度: 低）: ローカル実行でのみ検証可能。実装フェーズでの確認を推奨
-- **ADR-0003プラグインワーカーとOTelコンテキスト伝播**（重要度: 低）: 将来的にOTelをopt-in導入した場合、Phase 2+のプラグインワーカープロセスへのコンテキスト伝播がIPC設計に影響する可能性あり。Phase 2 ADRで対処
+- **ADR-0003プラグインワーカーとOTelコンテキスト伝播**（重要度: 低）: Phase 2+でのプラグインワーカープロセスへのTraceId/SpanId伝播がIPC設計に影響する可能性あり。Phase 2の別途ADRで対処
+- **コード実装**（Program.cs OTel初期化・csproj条件付き参照・MSBuildWorkspace NuGet制御）: 本調査ピースのスコープ外。実装に必要な全技術情報（PatternDコード・ForceFlushタイムアウト値・EventListenerパターン・条件付きPackageReference記法）は`data-otel-dotnet.md`に収録済みであり、実装フェーズで即利用可能

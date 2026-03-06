@@ -1,7 +1,8 @@
 {
   "personaSessions": {
-    "retry": "918b17e4-22fb-45cf-ae42-d14173ad7f72"
+    "retry": "918b17e4-22fb-45cf-ae42-d14173ad7f72",
+    "instruct": "dc8b6bff-111d-4eca-b8a3-8fe57303df53"
   },
-  "updatedAt": "2026-03-06T02:21:47.148Z",
+  "updatedAt": "2026-03-06T03:10:48.056Z",
   "provider": "claude"
 }
